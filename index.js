@@ -1056,17 +1056,28 @@ function selectEmployee(employeeId, employeeText) {
 function populateMotorcycleDropdown() {
   const optionsContainer = document.getElementById('motorcycle-options');
   if (!optionsContainer) return;
-  const activeRequests = allData.filter(d => d.type === 'request' && (d.status === 'pending' || d.status === 'active'));
+
+  // همه درخواست‌های فعال (pending یا active)
+  const activeRequests = allData.filter(d => 
+    d.type === 'request' && (d.status === 'pending' || d.status === 'active')
+  );
   const requestedMotorcycleIds = activeRequests.map(r => r.motorcycleId);
+
+  // موتورهای موجود در دپارتمان انتخابی که رزرو نشده‌اند
   const availableMotorcyclesForRequest = availableMotorcycles.filter(moto =>
     !requestedMotorcycleIds.includes(moto.__backendId)
   );
+
   if (availableMotorcyclesForRequest.length === 0) {
-    optionsContainer.innerHTML = '<div class="p-3 text-gray-500 text-center">هیچ موتور سکیل آزادی در این دیپارتمنت موجود نیست</div>';
+    optionsContainer.innerHTML = '<div class="p-3 text-gray-500 text-center">هیچ موتور سیکل آزادی در این دیپارتمنت موجود نیست</div>';
     return;
   }
+
   optionsContainer.innerHTML = availableMotorcyclesForRequest.map(moto =>
-    `<div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectMotorcycle('${moto.__backendId}', '${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}')">${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}</div>`
+    `<div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0" 
+         onclick="selectMotorcycle('${moto.__backendId}', '${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}')">
+      ${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment} (پلاک: ${moto.motorcyclePlate})
+    </div>`
   ).join('');
 }
 function searchMotorcycles() {
@@ -1177,68 +1188,92 @@ function closeModal(modalId) {
 async function submitNewRequest(event) {
   event.preventDefault();
   if (currentRecordCount >= 100000000000) {
-    showToast('حداکثر تعداد رکوردها (۹۹۹) به پایان رسیده است', '⚠️');
+    showToast('حداکثر تعداد رکوردها (۹۹۹) به پایان رسیده است', 'هشدار');
     return;
   }
+
   const form = event.target;
   form.classList.add('loading');
+
   const employeeId = document.getElementById('selected-employee').value;
   const motorcycleId = document.getElementById('selected-motorcycle').value;
+
+  if (!employeeId || !motorcycleId) {
+    showToast('لطفاً کارمند و موتورسیکل را انتخاب کنید', 'هشدار');
+    form.classList.remove('loading');
+    return;
+  }
+
   const employee = allData.find(d => d.__backendId === employeeId);
   const motorcycle = allData.find(d => d.__backendId === motorcycleId);
+
+  if (!employee || !motorcycle) {
+    showToast('کارمند یا موتورسیکل یافت نشد', 'خطا');
+    form.classList.remove('loading');
+    return;
+  }
+
+  // چک نهایی: آیا این موتورسیکل همین الان رزرو شده؟
+  const isAlreadyRequested = allData.some(d =>
+    d.type === 'request' &&
+    d.motorcycleId === motorcycleId &&
+    (d.status === 'pending' || d.status === 'active')
+  );
+
+  if (isAlreadyRequested) {
+    showToast('این موتورسیکل در حال حاضر رزرو شده یا در حال استفاده است!', 'خطا');
+    form.classList.remove('loading');
+    
+    // دراپ‌داون رو دوباره آپدیت کن تا کاربر ببینه دیگه نیست
+    populateMotorcycleDropdown();
+    document.getElementById('selected-motorcycle').value = '';
+    document.getElementById('motorcycle-display').textContent = 'موتور سیکل را انتخاب کنید';
+    
+    return;
+  }
+
   const now = new Date();
- 
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0'); 
+  const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const requestDate = `${year}/${month}/${day}`;
- 
+
   let requesterFullName = 'ناشناس';
-  if (window.currentUser && window.currentUser.fullName) {
+  if (window.currentUser?.fullName) {
     requesterFullName = window.currentUser.fullName;
-    console.log('Requester from currentUser:', requesterFullName); 
-  } else {
-    try {
-      const session = JSON.parse(localStorage.getItem('session'));
-      if (session && session.fullName) {
-        requesterFullName = session.fullName;
-        console.log('Requester from session:', requesterFullName);
-      } else {
-        console.error('No fullName in session or currentUser!');
-      }
-    } catch (e) {
-      console.error('Session parse error:', e);
-    }
+  } else if (JSON.parse(localStorage.getItem('session') || '{}').fullName) {
+    requesterFullName = JSON.parse(localStorage.getItem('session')).fullName;
   }
- 
-  console.log('Request Date (fixed):', requestDate);
-  console.log('Requester FullName:', requesterFullName);
- 
+
   const requestData = {
     type: 'request',
     employeeId: employee.employeeId,
     employeeName: employee.employeeName,
     department: employee.department,
     fingerprintId: employee.fingerprintId,
-    motorcycleId: motorcycle.__backendId,
+    motorcycleId: motorcycle.__backendId,  // این خیلی مهمه
     motorcycleName: motorcycle.motorcycleName,
     motorcycleColor: motorcycle.motorcycleColor,
     motorcyclePlate: motorcycle.motorcyclePlate,
     motorcycleDepartment: motorcycle.motorcycleDepartment,
-    requestDate: requestDate, 
+    requestDate: requestDate,
     requesterFullName: requesterFullName,
     exitTime: '',
     entryTime: '',
     status: 'pending'
   };
+
   const result = await window.dataSdk.create(requestData);
   form.classList.remove('loading');
+
   if (result.isOk) {
-    showToast('درخواست با موفقیت ثبت شد', '✅');
+    showToast('درخواست با موفقیت ثبت شد', 'موفقیت');
     closeModal('new-request-modal');
     resetRequestForm();
+    // آپدیت خودکار وضعیت موتورها
+    if (typeof updateCurrentPage === 'function') updateCurrentPage();
   } else {
-    showToast('خطا در ثبت درخواست', '❌');
+    showToast('خطا در ثبت درخواست', 'خطا');
   }
 }
 function resetRequestForm() {
@@ -1421,4 +1456,5 @@ if (window.location.hostname !== '127.0.0.1' && window.location.hostname !== 'lo
   (function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99bbf8eb8072d381',t:'MTc2MjY3NzI4MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();
 
 }
+
 
