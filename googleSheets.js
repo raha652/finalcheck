@@ -164,32 +164,18 @@ function mapGSToRequest(record) {
     requesterFullName: record['نام درخواست کننده'],
     exitTime: formatTimeToString(record['زمان خروج']) || '',
     entryTime: formatTimeToString(record['زمان ورود']) || '',
-    status: record['وضعیت']
+    status: record['وضعیت'],
+    motorcycleId: record['Unique ID'] // این قبلاً بود، اما حالا مطمئن شویم motorcycleId درست است
   };
 }
 async function syncRequestsWithGoogleSheets(allDataRef) {
   try {
     const result = await callGoogleSheets('readAll', 'request');
     if (result.success) {
-      let gsRequests = result.data
+      const gsRequests = result.data
         .map(mapGSToRequest)
         .filter(req => req.__backendId);
       const nonRequestData = allDataRef.filter(d => d.type !== 'request');
-      const motorcycles = nonRequestData.filter(d => d.type === 'motorcycle');
-      for (let req of gsRequests) {
-        const matchingMotor = motorcycles.find(m => 
-          m.motorcycleName === req.motorcycleName &&
-          m.motorcycleColor === req.motorcycleColor &&
-          m.motorcyclePlate === req.motorcyclePlate &&
-          m.motorcycleDepartment === req.motorcycleDepartment
-        );
-        if (matchingMotor) {
-          req.motorcycleId = matchingMotor.__backendId;
-        } else {
-          console.warn('No matching motorcycle found for request:', req);
-          // Optionally filter out invalid requests: gsRequests = gsRequests.filter(r => r !== req);
-        }
-      }
       allDataRef.length = 0;
       allDataRef.push(...nonRequestData, ...gsRequests);
       await saveData(allDataRef);
@@ -199,6 +185,43 @@ async function syncRequestsWithGoogleSheets(allDataRef) {
   } catch (error) {
     console.error('Error syncing requests:', error);
     return false;
+  }
+}
+function mapStatusToGS(item) {
+  return {
+    'Motorcycle ID': item.motorcycleId,
+    'Status': item.status,
+    'Employee Name': item.employeeName || '',
+    'Timestamp': new Date().toISOString()
+  };
+}
+function mapGSToStatus(record) {
+  return {
+    motorcycleId: record['Motorcycle ID'],
+    status: record['Status'],
+    employeeName: record['Employee Name'],
+    timestamp: record['Timestamp']
+  };
+}
+async function syncStatusWithGoogleSheets() {
+  try {
+    const result = await callGoogleSheets('readAll', 'status');
+    if (result.success) {
+      const gsStatus = result.data.map(mapGSToStatus);
+      localStorage.setItem('motorcycleStatus', JSON.stringify(gsStatus));
+      return gsStatus;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error syncing status:', error);
+    return [];
+  }
+}
+async function updateStatusInGS(motorcycleId, status, employeeName) {
+  const statusData = mapStatusToGS({ motorcycleId, status, employeeName });
+  const result = await callGoogleSheets('update', 'status', statusData); // فرض کنید Apps Script از update برای status پشتیبانی می‌کند
+  if (!result.success) {
+    console.error('Error updating status in GS');
   }
 }
 function mapUserToGS(item) {
