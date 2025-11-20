@@ -8,12 +8,12 @@ const defaultConfig = {
   card_color: '#ffffff'
 };
 let allData = [];
-let allUsers = []; 
+let allUsers = [];
 let currentRecordCount = 0;
 let currentPasswordType = '';
 let currentStatusFilter = 'all';
-let departments = []; 
-let currentUserRole = ''; 
+let departments = [];
+let currentUserRole = '';
 let historySearchTerm = '';
 let historyFromDate = '';
 let historyToDate = '';
@@ -28,29 +28,22 @@ JalaliDate.jalaliToGregorian = function(j_y, j_m, j_d) {
   var jy = j_y - 979;
   var jm = j_m - 1;
   var jd = j_d - 1;
-
   var j_day_no = 365 * jy + parseInt(jy / 33) * 8 + parseInt((jy % 33 + 3) / 4);
   for (var i = 0; i < jm; ++i) j_day_no += JalaliDate.j_days_in_month[i];
-
   j_day_no += jd;
-
   var g_day_no = j_day_no + 79;
-
   var gy = 1600 + 400 * parseInt(g_day_no / 146097);
   g_day_no = g_day_no % 146097;
-
   var leap = true;
-  if (g_day_no >= 36525) 
+  if (g_day_no >= 36525)
   {
     g_day_no--;
-    gy += 100 * parseInt(g_day_no / 36524); 
+    gy += 100 * parseInt(g_day_no / 36524);
     g_day_no = g_day_no % 36524;
-
     if (g_day_no >= 365) g_day_no++;
     else leap = false;
   }
-
-  gy += 4 * parseInt(g_day_no / 1461); 
+  gy += 4 * parseInt(g_day_no / 1461);
   g_day_no %= 1461;
   if (g_day_no >= 366) {
     leap = false;
@@ -66,8 +59,8 @@ JalaliDate.jalaliToGregorian = function(j_y, j_m, j_d) {
   gd = gd < 10 ? "0" + gd : gd;
   return [gy, gm, gd];
 };
-const dataStorageKey = 'motorcycleManagementData'; 
-const usersStorageKey = 'userAccountsData'; 
+const dataStorageKey = 'motorcycleManagementData';
+const usersStorageKey = 'userAccountsData';
 function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
@@ -90,8 +83,8 @@ async function saveData(data) {
 }
 async function loadUsers() {
   try {
-const stored = localStorage.getItem(usersStorageKey);
-allUsers = stored && stored !== 'undefined' ? JSON.parse(stored) : [];
+    const stored = localStorage.getItem(usersStorageKey);
+    allUsers = stored && stored !== 'undefined' ? JSON.parse(stored) : [];
     if (allUsers.length === 0) {
       const defaultAdmin = {
         __backendId: generateId(),
@@ -182,7 +175,7 @@ async function updateUserRole(userId, newRole) {
   const gsResult = await callGoogleSheets('update', 'accounts', gsData);
   if (!gsResult.success) {
     showToast('خطا در به‌روزرسانی اکانت در Google Sheets', '❌');
-    user.role = user.role === 'admin' ? 'admin' : 'user'; 
+    user.role = user.role === 'admin' ? 'admin' : 'user';
     await saveUsers(allUsers);
     return { isOk: false };
   }
@@ -197,7 +190,7 @@ async function syncUsersWithGoogleSheets() {
     if (result.success) {
       const gsUsers = result.data
         .map(mapGSToUser)
-        .filter(user => user.__backendId); 
+        .filter(user => user.__backendId);
       const defaultAdminExists = gsUsers.some(u => u.username === 'admin');
       if (!defaultAdminExists) {
         const defaultAdmin = {
@@ -210,7 +203,7 @@ async function syncUsersWithGoogleSheets() {
         gsUsers.push(defaultAdmin);
       }
       allUsers = gsUsers;
-      await saveUsers(allUsers); 
+      await saveUsers(allUsers);
       return true;
     }
     return false;
@@ -235,7 +228,7 @@ window.dataSdk = {
       showToast('هشدار: همگام‌سازی درخواست‌ها با Google Sheets ناموفق بود', '⚠️');
     }
     currentRecordCount = allData.length;
-    updateDepartments(); 
+    updateDepartments();
     if (handler && handler.onDataChanged) {
       handler.onDataChanged(allData);
     }
@@ -247,7 +240,7 @@ window.dataSdk = {
       return { isOk: false };
     }
     item.__backendId = generateId();
-    item.type = item.type || 'unknown'; 
+    item.type = item.type || 'unknown';
     if (item.type === 'employee') {
       const gsData = mapEmployeeToGS(item);
       const gsResult = await callGoogleSheets('create', 'employees', gsData);
@@ -275,7 +268,7 @@ window.dataSdk = {
     allData.push(item);
     await saveData(allData);
     currentRecordCount = allData.length;
-    updateDepartments(); 
+    updateDepartments();
     if (dataHandler && dataHandler.onDataChanged) {
       dataHandler.onDataChanged(allData);
     }
@@ -310,10 +303,10 @@ window.dataSdk = {
         return { isOk: false };
       }
     }
-    allData[index] = { ...allData[index], ...item }; 
+    allData[index] = { ...allData[index], ...item };
     await saveData(allData);
     currentRecordCount = allData.length;
-    updateDepartments(); 
+    updateDepartments();
     if (dataHandler && dataHandler.onDataChanged) {
       dataHandler.onDataChanged(allData);
     }
@@ -348,7 +341,7 @@ window.dataSdk = {
     allData.splice(index, 1);
     await saveData(allData);
     currentRecordCount = allData.length;
-    updateDepartments(); 
+    updateDepartments();
     if (dataHandler && dataHandler.onDataChanged) {
       dataHandler.onDataChanged(allData);
     }
@@ -357,7 +350,7 @@ window.dataSdk = {
 };
 function updateDepartments() {
   const uniqueDepartments = [...new Set(allData.filter(d => d.type === 'motorcycle').map(d => d.motorcycleDepartment))];
-  departments = uniqueDepartments.sort(); 
+  departments = uniqueDepartments.sort();
 }
 const passwords = {
   request: '123',
@@ -369,7 +362,7 @@ const dataHandler = {
   onDataChanged(data) {
     allData = data;
     currentRecordCount = data.length;
-    updateDepartments(); 
+    updateDepartments();
     updateCurrentPage();
   }
 };
@@ -545,7 +538,7 @@ async function initApp() {
     window.location.href = './login.html';
     return;
   }
-  window.currentUser = currentUser; 
+  window.currentUser = currentUser;
   currentUserRole = currentUser.role;
   session.fullName = currentUser.fullName;
   localStorage.setItem('session', JSON.stringify(session));
@@ -630,10 +623,10 @@ function setupIdleLogout() {
   if (window.idleInterval) {
     clearInterval(window.idleInterval);
   }
-  window.idleTime = 0; 
+  window.idleTime = 0;
   window.idleInterval = setInterval(() => {
     window.idleTime += 1;
-    if (window.idleTime >= 600) { 
+    if (window.idleTime >= 600) {
       showToast('به دلیل عدم فعالیت، شما لاگ‌اوت شدید', '⚠️');
       logout();
       clearInterval(window.idleInterval);
@@ -916,10 +909,10 @@ function filterHistory(completedRequests) {
   if (fromDateStr || toDateStr) {
     filtered = filtered.filter(r => {
       const parts = r.requestDate.split('/');
-      if (parts.length !== 3) return true; 
-      const [j_y, j_m, j_d] = parts.map(p => parseInt(p.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728)))); 
+      if (parts.length !== 3) return true;
+      const [j_y, j_m, j_d] = parts.map(p => parseInt(p.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728))));
       const gregDate = JalaliDate.jalaliToGregorian(j_y, j_m, j_d);
-      const reqDate = `${gregDate[0]}-${gregDate[1]}-${gregDate[2]}`; 
+      const reqDate = `${gregDate[0]}-${gregDate[1]}-${gregDate[2]}`;
       if (fromDateStr && reqDate < fromDateStr) return false;
       if (toDateStr && reqDate > toDateStr) return false;
       return true;
@@ -1056,87 +1049,40 @@ function selectEmployee(employeeId, employeeText) {
 function populateMotorcycleDropdown() {
   const optionsContainer = document.getElementById('motorcycle-options');
   if (!optionsContainer) return;
-
-  // درخواست‌های فعال (pending یا active)
-  const activeRequests = allData.filter(d =>
-    d.type === 'request' && (d.status === 'pending' || d.status === 'active')
-  );
+  const activeRequests = allData.filter(d => d.type === 'request' && (d.status === 'pending' || d.status === 'active'));
   const requestedMotorcycleIds = activeRequests.map(r => r.motorcycleId);
-
-  // موتورهای موجود در دپارتمان انتخابی + آزاد بودن
-  let motorcyclesInDept = [];
-  const selectedDept = document.getElementById('selected-department').value;
-
-  if (selectedDept === 'متفرقه') {
-    motorcyclesInDept = allData.filter(d => d.type === 'motorcycle');
-  } else {
-    motorcyclesInDept = allData.filter(d => 
-      d.type === 'motorcycle' && d.motorcycleDepartment === selectedDept
-    );
-  }
-
-  const availableMotorcyclesForRequest = motorcyclesInDept.filter(moto =>
+  const availableMotorcyclesForRequest = availableMotorcycles.filter(moto =>
     !requestedMotorcycleIds.includes(moto.__backendId)
   );
-
   if (availableMotorcyclesForRequest.length === 0) {
-    optionsContainer.innerHTML = '<div class="p-3 text-gray-500 text-center">هیچ موتور سیکل آزادی در این دیپارتمنت موجود نیست</div>';
+    optionsContainer.innerHTML = '<div class="p-3 text-gray-500 text-center">هیچ موتور سکیل آزادی در این دیپارتمنت موجود نیست</div>';
     return;
   }
-
-  optionsContainer.innerHTML = availableMotorcyclesForRequest.map(moto => `
-    <div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-         onclick="selectMotorcycle('${moto.__backendId}', '${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}')">
-      ${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment} (پلاک: ${moto.motorcyclePlate})
-    </div>
-  `).join('');
+  optionsContainer.innerHTML = availableMotorcyclesForRequest.map(moto =>
+    `<div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectMotorcycle('${moto.__backendId}', '${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}')">${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}</div>`
+  ).join('');
 }
 function searchMotorcycles() {
   const searchTerm = document.getElementById('motorcycle-search').value.toLowerCase();
-  
-  // 1. درخواست‌های فعال رو از allData بگیر (همیشه به‌روز)
-  const activeRequests = allData.filter(d => 
-    d.type === 'request' && (d.status === 'pending' || d.status === 'active')
-  );
+  const activeRequests = allData.filter(d => d.type === 'request' && (d.status === 'pending' || d.status === 'active'));
   const requestedMotorcycleIds = activeRequests.map(r => r.motorcycleId);
-
-  // 2. موتورهای دپارتمان انتخاب‌شده رو مستقیم از allData بگیر
-  const selectedDept = document.getElementById('selected-department').value;
-  let motorcyclesInDept = [];
-
-  if (selectedDept === 'متفرقه') {
-    motorcyclesInDept = allData.filter(d => d.type === 'motorcycle');
-  } else if (selectedDept) {
-    motorcyclesInDept = allData.filter(d => 
-      d.type === 'motorcycle' && d.motorcycleDepartment === selectedDept
-    );
-  } else {
-    // اگر هنوز دپارتمان انتخاب نشده
-    motorcyclesInDept = [];
-  }
-
-  // 3. موتورهای آزاد + مطابق با جستجو
-  const availableAndMatching = motorcyclesInDept.filter(moto => 
-    !requestedMotorcycleIds.includes(moto.__backendId) &&
-    (moto.motorcycleName.toLowerCase().includes(searchTerm) ||
-     moto.motorcycleColor.toLowerCase().includes(searchTerm) ||
-     moto.motorcyclePlate.toLowerCase().includes(searchTerm))
+  const availableMotorcyclesForRequest = availableMotorcycles.filter(moto =>
+    !requestedMotorcycleIds.includes(moto.__backendId)
   );
-
+  const filteredMotorcycles = availableMotorcyclesForRequest.filter(moto =>
+    moto.motorcycleName.toLowerCase().includes(searchTerm) ||
+    moto.motorcycleColor.toLowerCase().includes(searchTerm) ||
+    moto.motorcyclePlate.toLowerCase().includes(searchTerm)
+  );
   const optionsContainer = document.getElementById('motorcycle-options');
   if (!optionsContainer) return;
-
-  if (availableAndMatching.length === 0) {
+  if (filteredMotorcycles.length === 0) {
     optionsContainer.innerHTML = '<div class="p-3 text-gray-500 text-center">هیچ موتور سکیل آزادی یافت نشد</div>';
     return;
   }
-
-  optionsContainer.innerHTML = availableAndMatching.map(moto => `
-    <div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0" 
-         onclick="selectMotorcycle('${moto.__backendId}', '${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}')">
-      ${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment} (پلاک: ${moto.motorcyclePlate})
-    </div>
-  `).join('');
+  optionsContainer.innerHTML = filteredMotorcycles.map(moto =>
+    `<div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectMotorcycle('${moto.__backendId}', '${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}')">${moto.motorcycleName} - ${moto.motorcycleColor} - ${moto.motorcycleDepartment}</div>`
+  ).join('');
 }
 function toggleMotorcycleDropdown() {
   if (document.getElementById('motorcycle-select').disabled) return;
@@ -1208,9 +1154,9 @@ function verifyPassword(event) {
 function openNewRequestModal() {
   const employees = allData.filter(d => d.type === 'employee');
   const motorcycles = allData.filter(d => d.type === 'motorcycle');
-  updateModalSelects(employees, motorcycles); 
+  updateModalSelects(employees, motorcycles);
   document.getElementById('new-request-modal').classList.add('active');
-  populateDepartmentDropdown(); 
+  populateDepartmentDropdown();
 }
 function openNewMotorcycleModal() {
   document.getElementById('new-motorcycle-modal').classList.add('active');
@@ -1224,70 +1170,46 @@ function closeModal(modalId) {
 async function submitNewRequest(event) {
   event.preventDefault();
   if (currentRecordCount >= 100000000000) {
-    showToast('حداکثر تعداد رکوردها (۹۹۹) به پایان رسیده است', 'هشدار');
+    showToast('حداکثر تعداد رکوردها (۹۹۹) به پایان رسیده است', '⚠️');
     return;
   }
-
   const form = event.target;
   form.classList.add('loading');
-
   const employeeId = document.getElementById('selected-employee').value;
   const motorcycleId = document.getElementById('selected-motorcycle').value;
-
-  if (!employeeId || !motorcycleId) {
-    showToast('لطفاً کارمند و موتورسیکل را انتخاب کنید', 'هشدار');
-    form.classList.remove('loading');
-    return;
-  }
-
   const employee = allData.find(d => d.__backendId === employeeId);
   const motorcycle = allData.find(d => d.__backendId === motorcycleId);
-
-  if (!employee || !motorcycle) {
-    showToast('کارمند یا موتورسیکل یافت نشد', 'خطا');
-    form.classList.remove('loading');
-    return;
-  }
-
-  // چک نهایی: آیا این موتورسیکل همین الان رزرو شده؟
-  const isAlreadyRequested = allData.some(d =>
-    d.type === 'request' &&
-    d.motorcycleId === motorcycleId &&
-    (d.status === 'pending' || d.status === 'active')
-  );
-
-  if (isAlreadyRequested) {
-    showToast('این موتورسیکل در حال حاضر رزرو شده یا در حال استفاده است!', 'خطا');
-    form.classList.remove('loading');
-    
-    // دراپ‌داون رو دوباره آپدیت کن تا کاربر ببینه دیگه نیست
-    populateMotorcycleDropdown();
-    document.getElementById('selected-motorcycle').value = '';
-    document.getElementById('motorcycle-display').textContent = 'موتور سیکل را انتخاب کنید';
-    
-    return;
-  }
-
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const requestDate = `${year}/${month}/${day}`;
-
   let requesterFullName = 'ناشناس';
-  if (window.currentUser?.fullName) {
+  if (window.currentUser && window.currentUser.fullName) {
     requesterFullName = window.currentUser.fullName;
-  } else if (JSON.parse(localStorage.getItem('session') || '{}').fullName) {
-    requesterFullName = JSON.parse(localStorage.getItem('session')).fullName;
+    console.log('Requester from currentUser:', requesterFullName);
+  } else {
+    try {
+      const session = JSON.parse(localStorage.getItem('session'));
+      if (session && session.fullName) {
+        requesterFullName = session.fullName;
+        console.log('Requester from session:', requesterFullName);
+      } else {
+        console.error('No fullName in session or currentUser!');
+      }
+    } catch (e) {
+      console.error('Session parse error:', e);
+    }
   }
-
+  console.log('Request Date (fixed):', requestDate);
+  console.log('Requester FullName:', requesterFullName);
   const requestData = {
     type: 'request',
     employeeId: employee.employeeId,
     employeeName: employee.employeeName,
     department: employee.department,
     fingerprintId: employee.fingerprintId,
-    motorcycleId: motorcycle.__backendId,  // این خیلی مهمه
+    motorcycleId: motorcycle.__backendId,
     motorcycleName: motorcycle.motorcycleName,
     motorcycleColor: motorcycle.motorcycleColor,
     motorcyclePlate: motorcycle.motorcyclePlate,
@@ -1298,23 +1220,14 @@ async function submitNewRequest(event) {
     entryTime: '',
     status: 'pending'
   };
-
   const result = await window.dataSdk.create(requestData);
   form.classList.remove('loading');
-
   if (result.isOk) {
-    showToast('درخواست با موفقیت ثبت شد', 'موفقیت');
+    showToast('درخواست با موفقیت ثبت شد', '✅');
     closeModal('new-request-modal');
     resetRequestForm();
-    // آپدیت خودکار وضعیت موتورها
-    if (typeof updateCurrentPage === 'function') updateCurrentPage();
-    // بعد از ثبت درخواست، کش موتورها رو ریست کن
-availableMotorcycles = [];
-if (document.getElementById('selected-department').value) {
-  filterByDepartment(); // دوباره فیلتر کنه با داده‌های جدید
-}
   } else {
-    showToast('خطا در ثبت درخواست', 'خطا');
+    showToast('خطا در ثبت درخواست', '❌');
   }
 }
 function resetRequestForm() {
@@ -1495,8 +1408,4 @@ function toggleUserDropdown() {
 document.addEventListener('DOMContentLoaded', initApp);
 if (window.location.hostname !== '127.0.0.1' && window.location.hostname !== 'localhost') {
   (function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99bbf8eb8072d381',t:'MTc2MjY3NzI4MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();
-
 }
-
-
-
