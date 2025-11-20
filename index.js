@@ -61,6 +61,8 @@ JalaliDate.jalaliToGregorian = function(j_y, j_m, j_d) {
 };
 const dataStorageKey = 'motorcycleManagementData';
 const usersStorageKey = 'userAccountsData';
+const lastSyncKey = 'lastSyncTime'; // جدید: برای caching
+const syncInterval = 300000; // 5 دقیقه (در میلی‌ثانیه)
 function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
@@ -83,8 +85,8 @@ async function saveData(data) {
 }
 async function loadUsers() {
   try {
-    const stored = localStorage.getItem(usersStorageKey);
-    allUsers = stored && stored !== 'undefined' ? JSON.parse(stored) : [];
+const stored = localStorage.getItem(usersStorageKey);
+allUsers = stored && stored !== 'undefined' ? JSON.parse(stored) : [];
     if (allUsers.length === 0) {
       const defaultAdmin = {
         __backendId: generateId(),
@@ -215,17 +217,25 @@ async function syncUsersWithGoogleSheets() {
 window.dataSdk = {
   init: async (handler) => {
     allData = await loadData();
-    const employeeSyncSuccess = await syncEmployeesWithGoogleSheets(allData);
-    if (!employeeSyncSuccess) {
-      showToast('هشدار: همگام‌سازی کارمندان با Google Sheets ناموفق بود', '⚠️');
-    }
-    const motorcycleSyncSuccess = await syncMotorcyclesWithGoogleSheets(allData);
-    if (!motorcycleSyncSuccess) {
-      showToast('هشدار: همگام‌سازی موتور سکیل‌ها با Google Sheets ناموفق بود', '⚠️');
-    }
-    const requestSyncSuccess = await syncRequestsWithGoogleSheets(allData);
-    if (!requestSyncSuccess) {
-      showToast('هشدار: همگام‌سازی درخواست‌ها با Google Sheets ناموفق بود', '⚠️');
+    const lastSync = localStorage.getItem(lastSyncKey);
+    const now = Date.now();
+    const needsSync = !lastSync || (now - parseInt(lastSync) > syncInterval) || allData.length === 0;
+    if (needsSync) {
+      const employeeSyncSuccess = await syncEmployeesWithGoogleSheets(allData);
+      if (!employeeSyncSuccess) {
+        showToast('هشدار: همگام‌سازی کارمندان با Google Sheets ناموفق بود', '⚠️');
+      }
+      const motorcycleSyncSuccess = await syncMotorcyclesWithGoogleSheets(allData);
+      if (!motorcycleSyncSuccess) {
+        showToast('هشدار: همگام‌سازی موتور سکیل‌ها با Google Sheets ناموفق بود', '⚠️');
+      }
+      const requestSyncSuccess = await syncRequestsWithGoogleSheets(allData);
+      if (!requestSyncSuccess) {
+        showToast('هشدار: همگام‌سازی درخواست‌ها با Google Sheets ناموفق بود', '⚠️');
+      }
+      localStorage.setItem(lastSyncKey, now.toString());
+    } else {
+      console.log('Using cached data');
     }
     currentRecordCount = allData.length;
     updateDepartments();
@@ -241,9 +251,10 @@ window.dataSdk = {
     }
     item.__backendId = generateId();
     item.type = item.type || 'unknown';
+    let gsResult;
     if (item.type === 'employee') {
       const gsData = mapEmployeeToGS(item);
-      const gsResult = await callGoogleSheets('create', 'employees', gsData);
+      gsResult = await callGoogleSheets('create', 'employees', gsData);
       if (!gsResult.success) {
         showToast('خطا در ذخیره کارمند در Google Sheets', '❌');
         return { isOk: false };
@@ -251,7 +262,7 @@ window.dataSdk = {
     }
     if (item.type === 'motorcycle') {
       const gsData = mapMotorcycleToGS(item);
-      const gsResult = await callGoogleSheets('create', 'motors', gsData);
+      gsResult = await callGoogleSheets('create', 'motors', gsData);
       if (!gsResult.success) {
         showToast('خطا در ذخیره موتور سکیل در Google Sheets', '❌');
         return { isOk: false };
@@ -259,11 +270,13 @@ window.dataSdk = {
     }
     if (item.type === 'request') {
       const gsData = mapRequestToGS(item);
-      const gsResult = await callGoogleSheets('create', 'request', gsData);
+      gsResult = await callGoogleSheets('create', 'request', gsData);
       if (!gsResult.success) {
         showToast('خطا در ذخیره درخواست در Google Sheets', '❌');
         return { isOk: false };
       }
+      // جدید: بروزرسانی status tab
+      await updateStatusInGS(item.motorcycleId, 'pending', item.employeeName);
     }
     allData.push(item);
     await saveData(allData);
@@ -279,9 +292,10 @@ window.dataSdk = {
     if (index === -1) {
       return { isOk: false };
     }
+    let gsResult;
     if (item.type === 'employee') {
       const gsData = mapEmployeeToGS(item);
-      const gsResult = await callGoogleSheets('update', 'employees', gsData);
+      gsResult = await callGoogleSheets('update', 'employees', gsData);
       if (!gsResult.success) {
         showToast('خطا در به‌روزرسانی کارمند در Google Sheets', '❌');
         return { isOk: false };
@@ -289,7 +303,7 @@ window.dataSdk = {
     }
     if (item.type === 'motorcycle') {
       const gsData = mapMotorcycleToGS(item);
-      const gsResult = await callGoogleSheets('update', 'motors', gsData);
+      gsResult = await callGoogleSheets('update', 'motors', gsData);
       if (!gsResult.success) {
         showToast('خطا در به‌روزرسانی موتور سکیل در Google Sheets', '❌');
         return { isOk: false };
@@ -297,11 +311,13 @@ window.dataSdk = {
     }
     if (item.type === 'request') {
       const gsData = mapRequestToGS(item);
-      const gsResult = await callGoogleSheets('update', 'request', gsData);
+      gsResult = await callGoogleSheets('update', 'request', gsData);
       if (!gsResult.success) {
         showToast('خطا در به‌روزرسانی درخواست در Google Sheets', '❌');
         return { isOk: false };
       }
+      // جدید: بروزرسانی status tab
+      await updateStatusInGS(item.motorcycleId, item.status, item.employeeName);
     }
     allData[index] = { ...allData[index], ...item };
     await saveData(allData);
@@ -317,26 +333,29 @@ window.dataSdk = {
     if (index === -1) {
       return { isOk: false };
     }
+    let gsResult;
     if (item.type === 'employee') {
-      const gsResult = await callGoogleSheets('delete', 'employees', { __backendId: item.__backendId });
+      gsResult = await callGoogleSheets('delete', 'employees', { __backendId: item.__backendId });
       if (!gsResult.success) {
         showToast('خطا در حذف کارمند از Google Sheets', '❌');
         return { isOk: false };
       }
     }
     if (item.type === 'motorcycle') {
-      const gsResult = await callGoogleSheets('delete', 'motors', { __backendId: item.__backendId });
+      gsResult = await callGoogleSheets('delete', 'motors', { __backendId: item.__backendId });
       if (!gsResult.success) {
         showToast('خطا در حذف موتور سکیل از Google Sheets', '❌');
         return { isOk: false };
       }
     }
     if (item.type === 'request') {
-      const gsResult = await callGoogleSheets('delete', 'request', { __backendId: item.__backendId });
+      gsResult = await callGoogleSheets('delete', 'request', { __backendId: item.__backendId });
       if (!gsResult.success) {
         showToast('خطا در حذف درخواست از Google Sheets', '❌');
         return { isOk: false };
       }
+      // جدید: بروزرسانی status tab به available
+      await updateStatusInGS(item.motorcycleId, 'available', '');
     }
     allData.splice(index, 1);
     await saveData(allData);
@@ -797,39 +816,36 @@ function renderMotorcycleStatus(motorcycles, requests) {
     container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-300"><p class="text-lg">هیچ موتورسیکلی ثبت نشده است</p></div>';
     return;
   }
+  // جدید: لود از status tab برای سرعت
+  let statusData = JSON.parse(localStorage.getItem('motorcycleStatus') || '[]');
+  if (statusData.length === 0) {
+    statusData = await syncStatusWithGoogleSheets();
+  }
   let availableCount = 0;
   let pendingCount = 0;
   let inUseCount = 0;
   const motorcycleStatusData = motorcycles.map(motorcycle => {
-    // Find active request for this motorcycle
-    const activeRequest = requests.find(r =>
-      r.motorcycleId === motorcycle.__backendId &&
-      (r.status === 'pending' || r.status === 'active')
-    );
-    let status, statusClass, statusIcon, statusText, employeeInfo;
-    if (!activeRequest) {
-      // Available in parking
-      status = 'available';
+    const statusRecord = statusData.find(s => s.motorcycleId === motorcycle.__backendId) || { status: 'available', employeeName: '' };
+    let status = statusRecord.status;
+    let statusClass, statusIcon, statusText, employeeInfo;
+    let activeRequest = {}; // اگر نیاز به جزئیات بیشتر
+    if (status === 'available') {
       statusClass = 'bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-400/30';
       statusIcon = '🅿️';
       statusText = 'موجود در پارکینگ';
       employeeInfo = '';
       availableCount++;
-    } else if (activeRequest.status === 'pending') {
-      // Waiting for exit
-      status = 'pending';
+    } else if (status === 'pending') {
       statusClass = 'bg-gradient-to-br from-yellow-500/20 to-orange-600/20 border-yellow-400/30';
       statusIcon = '⏳';
       statusText = 'در انتظار خروج';
-      employeeInfo = `👤 ${activeRequest.employeeName}`;
+      employeeInfo = `👤 ${statusRecord.employeeName}`;
       pendingCount++;
-    } else if (activeRequest.status === 'active') {
-      // In use
-      status = 'in-use';
+    } else if (status === 'in-use') {
       statusClass = 'bg-gradient-to-br from-red-500/20 to-pink-600/20 border-red-400/30';
       statusIcon = '🔄';
       statusText = 'در حال استفاده';
-      employeeInfo = `👤 ${activeRequest.employeeName}`;
+      employeeInfo = `👤 ${statusRecord.employeeName}`;
       inUseCount++;
     }
     return {
@@ -1409,3 +1425,4 @@ document.addEventListener('DOMContentLoaded', initApp);
 if (window.location.hostname !== '127.0.0.1' && window.location.hostname !== 'localhost') {
   (function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99bbf8eb8072d381',t:'MTc2MjY3NzI4MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();
 }
+
